@@ -1,0 +1,40 @@
+# -------- Android / Gradle --------
+.gradle/
+build/
+local.properties
+*.apk
+*.ap_
+*.aab
+
+# Android Studio / IDE files
+.idea/
+*.iml
+*.hprof
+captures/
+.externalNativeBuild/
+
+# NDK / Native builds
+.cxx/
+*.so
+*.o
+*.obj
+
+# Keystore and secrets (VERY IMPORTANT)
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+
+# Kotlin / Java caches
+*.class
+*.jar
+*.war
+*.ear
+
+# Mac / Windows junk (safe to ignore)
+.DS_Store
+Thumbs.db
+
+# Large model files (we will manage these separately)
+*.gguf
+*.bin
