@@ -44,8 +44,14 @@ fun OffgridApp() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("OFFGRID") }
+                title = {
+                    Text(
+                        text = "OFFGRID",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             )
+
         }
     ) { innerPadding ->
 

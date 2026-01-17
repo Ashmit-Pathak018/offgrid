@@ -26,8 +26,11 @@ fun InputScreen(
             onValueChange = onTextChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)   // THIS makes it take all remaining space
+                .weight(1f)
                 .padding(8.dp),
+            textStyle = LocalTextStyle.current.copy(
+                color = MaterialTheme.colorScheme.onSurface
+            ),
             decorationBox = { innerTextField ->
                 Box(
                     modifier = Modifier
@@ -35,12 +38,16 @@ fun InputScreen(
                         .padding(8.dp)
                 ) {
                     if (text.isEmpty()) {
-                        Text("Type or paste your code here...")
+                        Text(
+                            "Type or paste your code here...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     innerTextField()
                 }
             }
         )
+
 
         Spacer(modifier = Modifier.height(12.dp))
 
