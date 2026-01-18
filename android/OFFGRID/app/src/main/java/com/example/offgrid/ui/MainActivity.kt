@@ -101,12 +101,34 @@ fun OFFGRIDApp() {
                     )
 
                     ScreenState.RESPONSE -> ResponseScreen(
-                        // Fake response for now
-                        response = "Analysis Complete.\n\n" +
-                                "Found optimization opportunity in loop structure:\n" +
-                                "> Reduced time complexity from O(n^2) to O(n).\n\n" +
-                                "Suggestion:\n" +
-                                "Use a Hash Map to cache visited nodes instead of nested iteration.",
+                        response = """
+        # Analysis Complete
+        Found optimization opportunity in loop structure.
+        
+        ### Issue Detected
+        The time complexity is currently **O(n^2)**. We can reduce this to **O(n)** using a Hash Map.
+        
+        ### Suggested Fix
+        Here is the optimized code:
+        
+        ```kotlin
+        fun findPairs(nums: IntArray, target: Int): List<Pair<Int, Int>> {
+            val map = HashMap<Int, Int>()
+            val result = mutableListOf<Pair<Int, Int>>()
+            
+            for (num in nums) {
+                val complement = target - num
+                if (map.containsKey(complement)) {
+                    result.add(Pair(complement, num))
+                }
+                map[num] = 1
+            }
+            return result
+        }
+        ```
+        
+        > Note: This approach uses more memory but is significantly faster for large datasets.
+    """.trimIndent(),
                         onBack = { screenState = ScreenState.INPUT }
                     )
                 }
