@@ -21,4 +21,13 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "OFFGRID"
-include(":app")
+include(":app") // Your Main App
+
+// --- THE FIX ---
+// 1. Give names to the two parts of the engine
+include(":llama-wrapper")
+include(":llama-lib")
+
+// 2. Point them to the correct folders inside 'llama-engine'
+project(":llama-wrapper").projectDir = file("llama-engine/app")
+project(":llama-lib").projectDir = file("llama-engine/lib")

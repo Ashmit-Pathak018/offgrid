@@ -1,6 +1,7 @@
 package com.example.offgrid.ui
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -18,7 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.offgrid.R
-import com.example.offgrid.logic.LlamaHelper // Import the Brain
+// ✅ UPDATED IMPORTS: Use the new Architecture
+import com.example.offgrid.logic.BackendFactory
+import com.example.offgrid.logic.AIBackend
 import com.example.offgrid.ui.theme.OFFGRIDTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,59 +45,86 @@ fun OFFGRIDApp() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // 1. Initialize the Brain (Pass 'context' here!)
-    val llamaHelper = remember { LlamaHelper(context) }
+    // ✅ 1. NEW ENGINE: Replaced LlamaHelper with the Factory
+    val aiBackend: AIBackend = remember { BackendFactory.create(context) }
 
-    // 2. State Management
-    var screenState by remember { mutableStateOf(ScreenState.INPUT) }
-    var inputText by remember { mutableStateOf("") }
-    var responseContent by remember { mutableStateOf("") } // Stores the live answer
+    // 1. STATE: Controls the Splash Screen
     var showSplash by remember { mutableStateOf(true) }
 
-    // 3. Load Model in Background on App Start
+    var screenState by remember { mutableStateOf(ScreenState.INPUT) }
+    var inputText by remember { mutableStateOf("") }
+    var responseText by remember { mutableStateOf("") }
+    var isGenerating by remember { mutableStateOf(false) }
+
+    // ✅ 2. INIT: Use the new initialize() function
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            val success = llamaHelper.initModel() // Looks for /data/local/tmp/model.bin
+            val success = aiBackend.initialize()
             if (!success) {
-                // If it fails, we prepopulate the response so the user knows immediately
-                responseContent = "Error: Model file missing.\nDid you run the ADB Push command?"
+                responseText = "Error: Model file missing.\nPlease put 'qwen.gguf' in Documents/OFFGRID/models/"
             }
         }
     }
 
-    // 4. The "Bouncer" Logic (Blocks non-coding questions)
-    fun isTechnical(input: String): Boolean {
-        // Simple keywords for now
-        val keywords = listOf("code", "fun", "class", "error", "debug", "java", "python", "c", "stack", "list", "why", "how", "fix")
-        return keywords.any { input.contains(it, ignoreCase = true) }
+    // ✅ 3. CLEANUP: Ensure threads die when app closes
+    DisposableEffect(Unit) {
+        onDispose {
+            aiBackend.shutdown()
+        }
     }
 
-    // 5. The Solver Logic
-    fun runSolver(prompt: String) {
-        if (!isTechnical(prompt)) {
-            responseContent = "I am an offline coding tool. Please ask a technical question."
+    fun runSolver(input: String, mode: String) {
+        val keywords = listOf("code", "fun", "class", "error", "debug", "java", "python", "c", "stack", "list", "why", "how", "fix")
+        val isTechnical = keywords.any { input.contains(it, ignoreCase = true) }
+
+        if (!isTechnical) {
+            responseText = "I am an offline coding tool. Please ask a technical question."
             screenState = ScreenState.RESPONSE
             return
         }
 
+        // 🧠 THE UPGRADE: "Professor Mode" is preserved here
+        // We pass this prompt string into the backend.
+        val baseInstruction = """
+            You are a strict Technical Interviewer and Computer Science Professor.
+            Your goal is academic accuracy and best practices.
+            
+            RULES:
+            1. If the user asks for a specific algorithm, use the strict textbook definition.
+            2. If the user's code works but uses the wrong logic, you MUST correct it.
+            3. Use clear variable names.
+        """.trimIndent()
+
+        val finalPrompt = when (mode) {
+            "DEBUG" -> "$baseInstruction\n\nTASK: Find bugs or logical errors in this code:\n$input"
+            "EXPLAIN" -> "$baseInstruction\n\nTASK: Explain this code step-by-step. Specify Time Complexity (Big O):\n$input"
+            "ANALYZE" -> "$baseInstruction\n\nTASK: Analyze Time/Space complexity. Suggest optimizations:\n$input"
+            else -> "$baseInstruction\n\nTASK: Solve this problem:\n$input"
+        }
+
         screenState = ScreenState.PROCESSING
-        responseContent = "" // Clear old text
+        responseText = ""
 
         scope.launch {
-            // Start the stream
-            llamaHelper.solveProblem(prompt).collect { token ->
-                responseContent += token
-
-                // As soon as first text arrives, show the Response Screen
-                if (screenState != ScreenState.RESPONSE) {
-                    screenState = ScreenState.RESPONSE
+            isGenerating = true
+            try {
+                // ✅ 4. GENERATE: Call the new backend stream
+                // We pass "RAW" as mode here because we manually built the prompt above
+                aiBackend.generateResponse(finalPrompt, "RAW").collect { token ->
+                    responseText += token
+                    if (screenState != ScreenState.RESPONSE) screenState = ScreenState.RESPONSE
                 }
+            } catch (e: Exception) {
+                responseText = "Error: ${e.message}"
+            } finally {
+                isGenerating = false
             }
         }
     }
 
+    // 2. THE GATEKEEPER LOGIC
     if (showSplash) {
-        SplashOverlay { showSplash = false }
+        SplashOverlay(onFinished = { showSplash = false })
     } else {
         Scaffold(
             containerColor = Color(0xFF0F172A),
@@ -110,40 +140,31 @@ fun OFFGRIDApp() {
                                 contentDescription = "OFFGRID",
                                 modifier = Modifier.size(26.dp)
                             )
-                            Text(
-                                text = "OFFGRID",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 2.sp,
-                                color = Color.White
-                            )
+                            Text("OFFGRID", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = Color.White)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color(0xFF0F172A),
-                        titleContentColor = Color.White
-                    )
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
                 )
             }
-        ) { paddingValues ->
-            Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (screenState) {
                     ScreenState.INPUT -> InputScreen(
                         text = inputText,
                         onTextChange = { inputText = it },
-                        onSolve = { runSolver(inputText) },
-                        onDebug = { runSolver("Find the bug in this code: $inputText") },
-                        onExplain = { runSolver("Explain this code logic: $inputText") }
+                        onSolve = { runSolver(inputText, "SOLVE") },
+                        onDebug = { runSolver(inputText, "DEBUG") },
+                        onExplain = { runSolver(inputText, "EXPLAIN") },
+                        onAnalyze = { runSolver(inputText, "ANALYZE") },
+                        onScan = { Toast.makeText(context, "Scanning...", Toast.LENGTH_SHORT).show() }
                     )
-
                     ScreenState.PROCESSING -> ProcessingScreen(
                         onCancel = { screenState = ScreenState.INPUT },
-                        onFakeComplete = { /* No-op: The stream handles the transition now */ }
+                        onFakeComplete = {}
                     )
-
                     ScreenState.RESPONSE -> ResponseScreen(
-                        response = responseContent, // Shows live text
+                        response = responseText,
+                        isGenerating = isGenerating,
                         onBack = { screenState = ScreenState.INPUT }
                     )
                 }

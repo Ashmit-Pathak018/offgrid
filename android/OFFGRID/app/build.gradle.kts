@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.offgrid"
-    compileSdk = 36 // Locked to stable version to prevent 'release(36)' errors
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.offgrid"
@@ -14,7 +14,6 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -27,27 +26,30 @@ android {
             )
         }
     }
+
+    // ✅ FIX 1: Upgrade to Java 17 to match the Llama Engine
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
+
     buildFeatures {
         compose = true
     }
 
-    // CRITICAL FIX: This prevents the app from crashing due to duplicate native files
     packaging {
         jniLibs {
-            pickFirst("lib/arm64-v8a/libc++_shared.so")
-            pickFirst("lib/armeabi-v7a/libc++_shared.so")
+            pickFirsts.add("lib/arm64-v8a/libc++_shared.so")
+            pickFirsts.add("lib/armeabi-v7a/libc++_shared.so")
         }
     }
 }
 
 dependencies {
+    // Standard Android Stuff
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -56,25 +58,28 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
 
+    // ✅ FIX 2: Connect the new Brain (The wrapper we built)
+    implementation(project(":llama-wrapper"))
+    implementation(project(":llama-lib"))
+
+    // Markdown & Icons (Keep these)
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.27.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.27.0")
-
-    // ADD THIS (The Google Standard):
-    implementation("com.google.mediapipe:tasks-genai:0.10.14")
-
-    // Coroutines
+    implementation("androidx.compose.material:material-icons-extended:1.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
+    // ❌ REMOVED: ljcamargo (Broken)
+    // ❌ REMOVED: mediapipe (Old)
+
+    // Test Stuff
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
